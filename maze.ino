@@ -203,8 +203,8 @@ void lineFollowPID() { pid_follower(); }
 //////////////////// NODE DETECTION ///////////////////
 bool leftAvail()    { return (sensor_reading[0] > line_threshold) || (sensor_reading[1] > line_threshold); }
 bool rightAvail()   { return (sensor_reading[6] > line_threshold) || (sensor_reading[7] > line_threshold); }
-bool straightAvail(){ return (sensor_reading[3] > line_threshold) ||
-                             (sensor_reading[4] > line_threshold) ||
+bool straightAvail(){ return ((sensor_reading[3] > line_threshold) ||
+                             (sensor_reading[4] > line_threshold) )||
                              (front_reading      > line_threshold); }
 
 bool detectDeadEnd() {
@@ -238,52 +238,91 @@ void moveForwardSmall() {
 
 // Turn capture: accept when mid band OR probe reacquires line
 void turnLeft() {
-  setMotor(0,0); delay(30);
-  // nudge over node so probe sits near the stem
-  setMotor(BASE_SPD, BASE_SPD); delay(90); setMotor(0,0); delay(10);
-
-  unsigned long t0 = millis();
-  setMotor(-BASE_SPD, BASE_SPD);
-  bool seenOff=false, captured=false;
-
-  while (millis() - t0 < 800) {
+    // Start turning
+    setMotor(-BASE_SPD, BASE_SPD);
+    
+    // Wait to lose line (with timeout)
+    unsigned long t = millis();
     sensor_read();
-    if (!midOnLine()) seenOff = true;
-    if (seenOff && midOnLine()) { captured=true; break; }
-  }
-
-  setMotor(0,0); delay(20);
-  setMotor(BASE_SPD, BASE_SPD); delay(ALIGN_FWD_MS);
-  setMotor(0,0);
-  integral_error = 0; previous_error = 0;
+    while(midOnLine() && (millis() - t < 500)) {
+        sensor_read();
+    }
+    
+    // Wait to find line again (with timeout)
+    t = millis();
+    while(!midOnLine() && (millis() - t < 800)) {
+        sensor_read();
+    }
+    
+    // Align forward a bit
+    setMotor(BASE_SPD, BASE_SPD);
+    delay(20);  // Move forward to center on line
+    
+    // Stop
+    setMotor(0, 0);
+    
+    // Reset PID
+    integral_error = 0;
+    previous_error = 0;
 }
 
 void turnRight() {
-  setMotor(0,0); delay(30);
-  setMotor(BASE_SPD, BASE_SPD); delay(90); setMotor(0,0); delay(10);
-
-  unsigned long t0 = millis();
-  setMotor(BASE_SPD, -BASE_SPD);
-  bool seenOff=false, captured=false;
-
-  while (millis() - t0 < 800) {
+  setMotor(BASE_SPD,-BASE_SPD);
+    
+    // Wait to lose line (with timeout)
+    unsigned long t = millis();
     sensor_read();
-    if (!midOnLine()) seenOff = true;
-    if (seenOff && midOnLine()) { captured=true; break; }
+    while(midOnLine() && (millis() - t < 500)) {
+        sensor_read();
+    }
+    
+    // Wait to find line again (with timeout)
+    t = millis();
+    while(!midOnLine() && (millis() - t < 800)) {
+        sensor_read();
+    }
+    
+    // Align forward a bit
+    setMotor(BASE_SPD, BASE_SPD);
+    delay(20);  // Move forward to center on line
+    
+    // Stop
+    setMotor(0, 0);
+    
+    // Reset PID
+    integral_error = 0;
+    previous_error = 0;
+  
   }
+  
+  
 
-  setMotor(0,0); delay(20);
-  setMotor(BASE_SPD, BASE_SPD); delay(ALIGN_FWD_MS);
-  setMotor(0,0);
-  integral_error = 0; previous_error = 0;
-}
 
 void turnBack() {
-  setMotor(0,0); delay(30);
-  setMotor(BASE_SPD, -BASE_SPD); delay(480);
-  setMotor(BASE_SPD, BASE_SPD);  delay(ALIGN_FWD_MS);
-  setMotor(0,0);
-  integral_error = 0; previous_error = 0;
+  setMotor(BASE_SPD, -BASE_SPD);
+    
+    // Phase 1: Wait to lose the current line
+    unsigned long t = millis();
+    sensor_read();
+    while(midOnLine() && (millis() - t < 600)) {
+        sensor_read();
+        delay(5);
+    }
+    
+    // Phase 2: Keep spinning until we find the line from opposite direction
+    t = millis();
+    while(!midOnLine() && (millis() - t < 1000)) {
+        sensor_read();
+        delay(5);
+    }
+    
+    // Stop turning
+    setMotor(0, 0);
+    
+  
+  
+    
+  
 }
 
 //////////////////// LSRB DECISION /////////////////////
